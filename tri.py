@@ -2,6 +2,7 @@
 import cv2
 import math
 import random
+import copy
 import numpy as np
 
 # load the image and show it
@@ -26,7 +27,10 @@ class Triangle:
     imgWidth = 0
     triPixels = [] # all pixels that are within the triangle
     bestPixels = []
-    numSteps = 100 # number of times to mutate triangle to find best fit
+    bestV1 = 0
+    bestV2 = 0
+    bestV3 = 0
+    numSteps = 50 # number of times to mutate triangle to find best fit
     v1 = 0
     v2 = 0
     v3 = 0
@@ -120,6 +124,7 @@ class Triangle:
 
         self.score = 999999999
         self.triPixels = [] # all pixels that are within the triangle
+        self.bestPixels = [] # all pixels that are within the triangle
 
 
         # get 3 random points
@@ -145,11 +150,21 @@ class Triangle:
             if score < self.score:
                 self.score = score
                 self.bestPixels = self.triPixels
+                avgTriangleColor = self.avgTriangleColor(self.bestPixels)
+                for s in self.bestPixels:
+                    newImg[s[0]][s[1]] = [avgTriangleColor[0],avgTriangleColor[1],avgTriangleColor[2]]
+                #print self.v1.x,self.v1.y,self.v2.x,self.v2.y,self.v3.x,self.v3.y
+                #print self.v1.x,self.v1.y,self.v2.x,self.v2.y,self.v3.x,self.v3.y
+                self.bestV1 = self.v1
+                self.bestV2 = self.v2
+                self.bestV3 = self.v3
+                cv2.imshow("original", newImg)
+                cv2.waitKey(0)
+
             else: # if current score is worse, roll back to old points
                 self.v1 = tempv1
                 self.v2 = tempv2
                 self.v3 = tempv3
-
         #print self.score
         #if self.score >= 70:
         #    return 1
@@ -170,11 +185,13 @@ class Triangle:
 
         r = g = b = a = 0
 
+        avgTriangleColor = self.avgTriangleColor(self.triPixels)
+
         # compare oldImg pixel value with the newImg
         for pixel in self.triPixels:
-            b = int(oldImg[pixel[0], pixel[1]][0]) - int(newImg[pixel[0], pixel[1]][0]) # avgColors[0] # b (compare to new)
-            g = int(oldImg[pixel[0], pixel[1]][1]) - int(newImg[pixel[0], pixel[1]][1]) #avgColors[1] # g
-            r = int(oldImg[pixel[0], pixel[1]][2]) - int(newImg[pixel[0], pixel[1]][2]) #avgColors[2] # r
+            b = int(oldImg[pixel[0], pixel[1]][0]) - int(avgTriangleColor[0]) # avgColors[0] # b (compare to new)
+            g = int(oldImg[pixel[0], pixel[1]][1]) - int(avgTriangleColor[1]) #avgColors[1] # g
+            r = int(oldImg[pixel[0], pixel[1]][2]) - int(avgTriangleColor[2]) #avgColors[2] # r
             #a = int(oldImg[pixel[0], pixel[1]][3]) - int(newImg[pixel[0], pixel[1]][3])
             score += ((b ** 2) + (g ** 2) + (r ** 2))# + (a ** 2))
 
@@ -287,37 +304,40 @@ b = b / (width * height)
 
 for x in range(0, width):
     for y in range(0, height):
-        newImg[y,x] = [b, g, r]
+        newImg[y,x] = [255, 255, 255]
 
 
-for j in range (0, 10):
+for j in range (0, 1):
     best = 99999999
     bestCalc = 0
+    bestPixels = []
 
     hmm = Triangle(oldImg)
     i = 0
-    while i < 100:
+    while i < 1:
         hmm.bestScoreCalc()
         if hmm.score < best:
-            bestCalc = hmm
-            best = hmm.score
+            bestCalc = copy.deepcopy(hmm)
+            best = bestCalc.score
+            bestPixels = bestCalc.bestPixels
         i += 1
+    print '--'
     overlay = newImg.copy()
-    avgTriangleColor = bestCalc.avgTriangleColor(bestCalc.triPixels)
-    tri = np.array( [[[bestCalc.v1.x,bestCalc.v1.y],[bestCalc.v2.x,bestCalc.v2.y],[bestCalc.v3.x,bestCalc.v3.y]]], dtype=np.int32 )
+    avgTriangleColor = bestCalc.avgTriangleColor(bestPixels)
+
+    tri = np.array( [[[bestCalc.bestV1.y,bestCalc.bestV1.x],[bestCalc.bestV2.y,bestCalc.bestV2.x],[bestCalc.bestV3.y,bestCalc.bestV3.x]]], dtype=np.int32 )
     cv2.fillPoly( overlay, tri, avgTriangleColor )
     opacity = 0.5
     cv2.addWeighted(overlay, opacity, newImg, 1 - opacity, 0, newImg)
-    print j, hmm.score
+    print j, bestCalc.score
         #print hmm.imgWidth, hmm.imgHeight
 
-
+    # issue is that the v1,v2,v3 are not set up properly
 
 
 
 
 
 #triangleRasterization()
-
 cv2.imshow("original", newImg)
 cv2.waitKey(0)
